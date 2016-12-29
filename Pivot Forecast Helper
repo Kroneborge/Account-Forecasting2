@@ -1,0 +1,277 @@
+public class PivotForecast_CLASS {
+    /*This class takes a aggregate result and returns a wrapper that give a horitzontal perspective to time series data
+* The time series should have the following key variables
+* totalAmount  - sum of amounts
+* period  - should be aggregated close date either month or quarter
+* year - aggregated years
+* aName - the variable to have vertically
+* 
+ * 
+ * */
+
+    public  static PivotRowAndTimeWrapper pivotTimeSeries(List<AggregateResult> aggOpp, set<string> periodYearSet) {
+        system.debug('PivotTimeSeries_Class *** start of part 1 - periodYearSet = ' + periodYearSEt + '  aggOpp = ' + aggOpp  );
+        system.debug('periodYearSet' + periodYearSEt);
+       // part 1 take the aggregate result and turn it into a list
+        IF (PeriodYearSet == NULL) { periodYearSet = new set<string>(); } // the complete list of periods and years in string form
+        List<string> periodYearList = new List<string>();
+                List<AggListWrapper> wrapperList = new List<AggListWrapper>();
+        List<PivotRowWrapper> completeRowList = new List<PivotRowWrapper>();
+                                try {
+            for (AggregateResult agg:aggOpp) {
+                String name = (string)agg.get('varName');
+                String acctId = (string)agg.get('accountID');
+                Integer period = (Integer)agg.get('period');
+                Integer year = (Integer)agg.get('year');
+                Decimal amount = (Decimal)agg.get('totalAmount');
+                if (amount == NULL ) { amount = 0;}
+                AggListWrapper wrapper = new AggListWrapper(name, acctId, amount, period, year);
+                wrapperList.add(wrapper);
+               }
+                     
+        } catch (exception e) { 
+            system.debug('PivotTimeSeries_Class *** error in the aggOpp loop ' + e);
+        }
+        system.debug('PivotTimeSeries_Class *** end of part 1 wrapperList = ' + wrapperList);
+        // end part 1 we now have a full wrapper list
+        
+//****************************************************************************        
+        // part 2 
+        Map<string, Decimal> amountMap = new Map<String, Decimal>();
+        string lastname;
+        string name;
+        string accountId;
+        string lastAccountId;
+        try {
+            for (AggListWrapper wrapper:wrapperList) {
+                name = wrapper.name;
+                accountId = wrapper.accountId;
+                decimal amount = wrapper.amount;
+                string periodYear = ''+ wrapper.year + '-' + wrapper.period;
+                periodYearSet.add(periodYear);
+                if (lastName == NULL) { lastName=name;}
+                if (lastName != name) {
+                    completeRowList.add(new PivotRowWrapper(lastName, lastAccountId, amountMap, NULL));
+                    amountMap = new Map<string, Decimal>();
+                 }
+                amountMap.put(periodYear, amount);
+                //system.debug('PivotTimeSeries_Class *** account id = ' + accountId + 'end of loop name=' + name + ' lastName=' + lastName + ' amountMap=' + amountMap);
+                lastName = name;
+                lastAccountId = accountId;
+             }
+        } catch (exception e) {
+            system.debug('PivotTimeSeries_Class *** error in the wraperList lopp ' + e);
+        }
+        periodYearList.addAll(periodYearSet);
+        periodYearList.sort();
+        completeRowList.add(new PivotRowWrapper(name, accountId, amountMap, NULL));  // line total is null when we first go through   
+        
+  
+                                system.debug('PivotTimeSeries_Class ***end part 2 - complteRowList = ' + completeRowList);
+                                // end part 2
+//****************************************************************************         
+
+               // Part 3   - take map of account names (sub map of time periods) and loop through the time periods and add zero's to any missing time periods         
+        List<PivotRowWrapper> updatedRowList = new List<PivotRowWrapper>();
+        for (PivotRowWrapper wrapper: completeRowList) {
+            name = wrapper.name;
+            accountId = wrapper.accountId;
+            amountMap = new Map<string, Decimal>();
+            Decimal lineTotal= 0;
+            Decimal amount = 0;
+            for (String qtrYear :periodYearList) {
+                if(wrapper.amountMap.containsKey(qtrYear)) {
+                    amount = wrapper.amountMap.get(qtrYear);
+                    amountMap.put(qtrYear, amount); 
+                    lineTotal += amount;
+                } else {
+                                amountMap.put(qtrYear, 0);   
+                }
+            }
+            amountMap.put('Total', lineTotal);
+            updatedRowList.add(new PivotRowWrapper(name, accountId, amountMap, lineTotal));
+        }
+
+        completeRowList = updatedRowList;
+
+        
+        
+        
+        system.debug('PivotTimeSeries_Class *** Part 3 completeRowList AFTER = ' + completeRowList);
+        system.debug('PivotTimeSeries_Class *** period list ' + periodYearList);
+        PivotRowAndTimeWrapper completeRowTimeWrapper = new PivotRowAndTimeWrapper(completeRowList, periodYearList);
+  
+        return completeRowTimeWrapper;
+
+}  // end the static pivot time series method
+    
+// ****************************************************************************************************************************8
+
+    
+// **************************************************************************************************    
+    public static PeriodWrapper generatePeriodData(String periodType, Integer noPeriods, date startDate, string addSub) {
+        List<string> periodYearList = new List<String>();
+        map<string, date> periodYearMap = new map<string, date>();
+        set<string> periodYearSet = new set<string>();
+        List<date> dateList = new List<date>();
+        Date workingdate = system.today();
+        Date lastDate;
+        Integer daysToSubtract;
+        if (periodType =='Quarterly' || periodType == 'qtr' || periodType == 'qtrly') {
+            workingDate = startDate;
+            if (addsub== 'add') {daystoSubtract = -100;}
+            else {daysToSubtract = 80;}
+            for (Integer i = 1; i < noPeriods; i ++)  {
+                workingdate = workingDate.toStartOfMonth();
+                Integer period = Decimal.valueOf(workingdate.month()).divide(3.0, 0, System.RoundingMode.UP).intValue();
+                Integer year = workingdate.year();            
+                string periodYear = ''+ year + '-' + period;
+                periodYearList.add(periodYear);  
+                periodYearMap.put(periodYear, workingDate);
+                workingDate = workingDate - (daysToSubtract);
+            }
+            lastDate = (workingDate + 100).toStartOfMonth();
+        }
+        
+   /*     
+        if (periodType=='monthly' || periodType == 'month') {
+            daysToSubtract = 20;
+                                for (Integer i = 1; i < noPeriods; i ++)  {
+                workingdate = workingDate.toStartOfMonth();
+                dateList.add(workingDate);
+                workingDate = workingDate - (daysToSubtract);
+                                }
+            lastDate = (workingDate + (daysToSubtract)).toStartOfMonth();
+            dateList.sort();
+            for (date d:dateList) {
+                Integer period = d.month();
+                Integer year = d.year();            
+                string periodYear = ''+ year + '-' + period;
+                periodYearList.add(periodYear);    
+            }
+
+        }
+
+*/        
+        PeriodWrapper pWrapper = new PeriodWrapper(periodYearList, lastDate, periodYearMap);
+        system.debug('PivotTimeSeries_Class *** generatePeriodDate *** periodYearList ' + periodYearList);
+                                return pWrapper;        
+    }   // end the generate period year data
+    
+
+
+
+
+// // *****************************************************************************
+    public class PeriodWrapper {
+        public List<string> periodYearList {get; set;}
+        public date lastDate {get; set;}
+        public map<string, date> periodYearMap {get; set;}
+        
+        public PeriodWrapper(List<string> periodYearList, date lastDate, map<string, date> periodYearMap) {
+            this.periodYearList = periodYearList;
+            this.lastDate = lastDate;
+            this.periodYearMap = periodYearMap;
+        }
+    }
+    
+    public class TwoVarWrapper {
+        public Map<string, map<string, MapAndTotalWrapper>> twoVarMap {get; set;}   
+        public Map<string, map<string, decimal>> columnSubTotalMap {get; set;}
+        public Map<string, decimal> columnGrandTotalMap {get; set;}
+        
+        public twoVarWrapper(Map<string, map<string, MapAndTotalWrapper>> twoVarMap, Map<string, map<string, decimal>> columnSubTotalMap, Map<string, decimal> columnGrandTotalMap ) {
+            this.twoVarMap = twoVarMap;
+            this.columnSubTotalMap = columnSubTotalMap;
+            this.columnGrandTotalMap = columnGrandTotalMap;
+            
+        }
+        
+    }
+    
+    
+    public class MapAndTotalWrapper {
+        public map<string, decimal> amountMap {get; set;}
+        public decimal lineTotal {get; set;}
+        
+        public MapAndTotalWrapper(map<string, decimal> amountMap, decimal lineTotal) {
+            this.amountMap = amountMap;
+            this.lineTotal = lineTotal;
+        }
+    }
+    
+    public class AggListWrapper {
+        // takes data from an aggregate result query and turns it into a list with the appropriate variables   
+        public string name;
+        public string accountId;
+        public Decimal amount;
+        public Integer period;
+        public Integer year;
+
+        public AggListWrapper(String name, string accountId, Decimal amount, Integer period, Integer year) {
+            this.name = name;
+            this.accountId = accountId;
+            this.amount = amount;
+            this.period = period;
+            this.year = year;
+        }
+    } // end the aggListWrapper
+    
+    
+    public class PivotRowWrapper {
+        public string name {get; set; }
+        public string accountId {get; set;}
+        public map<string, decimal> amountMap {get; set;}
+        public decimal lineTotal {Get; set; }
+
+        public PivotRowWrapper(String name, string accountId, map<string, decimal> amountMap, decimal lineTotal) {
+            this.name = name;
+            this.accountId = accountId;
+            this.amountMap = amountMap;
+            this.lineTotal = lineTotal;
+        }        
+      }  // end the wrapper class
+
+
+    
+    public class PivotRowAndTimeWrapper {
+           public List<PivotRowWrapper> wrapper {get; set; }
+           public List<String> periodYearList {get; set; }
+           
+           public PivotRowAndTimeWrapper(List<PivotRowWrapper> wrapper, List<String> periodYearList) {
+               this.wrapper = wrapper;
+               this.periodYearList = periodYearList;
+           }
+      }
+    
+    
+                public class SortWrapper implements Comparable {
+
+        public PivotRowWrapper wrapper;
+        
+        // Constructor
+        public SortWrapper(PivotRowWrapper wrapper) {
+            this.wrapper = wrapper;
+        }
+        
+        // Compare opportunities based on the opportunity amount.
+        public Integer compareTo(Object compareTo) {
+            // Cast argument to SortWrapper
+            SortWrapper compareToWrapper = (SortWrapper)compareTo;
+            
+            // The return value of 0 indicates that both elements are equal.
+            Integer returnValue = 0;
+            if (wrapper.lineTotal < compareToWrapper.wrapper.lineTotal) {
+                // Set return value to a positive value.
+                returnValue = 1;
+            } else if (wrapper.lineTotal > compareToWrapper.wrapper.lineTotal) {
+                // Set return value to a negative value.
+                returnValue = -1;
+            }
+            
+            return returnValue;       
+        }
+}    
+  
+
+}
