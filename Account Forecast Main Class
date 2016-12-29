@@ -1,0 +1,973 @@
+public class AccountForecast_CLASS {
+    
+    List<Account> acctList;
+    map<id, account> acctMap;
+    List<id> accountSalesOppSet;
+    List<id> accountSalesVASet;
+    public List<string> periodYearList {get; set;}
+    public List<string> year1List {get; set;}
+    public list<string> year2List {get; set;}
+    public List<string> forecastYearList {get; set;}
+    map<string, date> forecastYearMap;
+    public List<string> growthList {get; set;}
+    map<string, string> YoYCompareMap;
+    public map<string, string> forecastCompareMap {get; set;}
+    set<string> periodYearSet = new set<string>();
+    List<PivotForecast_CLASS.PivotRowWrapper> partialRowList;
+    List<PivotForecast_CLASS.PivotRowWrapper> oppRowList;
+    Map<id, PivotForecast_CLASS.PivotRowWrapper> oppRowMap;
+    SummaryRowWrapper accountTotal;
+     public  map<string, SummaryRowWrapper> SummaryRowMap {get; set;}
+    public List<string> summaryRowList {get; set;}
+    public List<CompleteRowWrapper> completeRowList {get; set;}
+    List<SortWrapper> sortList = new List<SortWrapper>();
+    public static String SORT_BY {get; set;} 
+    public static string SORT_PREFIX;
+    public static String SORT_DIRECTION {get; set;}
+    string LAST_SORT;
+    static Integer reverseNo = 1;
+    public integer count {get; set;}
+    
+    Date startOfQuarter;
+    public Account_Forecast__c startForecast {get; set;}
+    public Date workingdate {get; set;}  // this quarter date
+    date startForecastDate;
+    date endForecastDate;
+    date lastPeriodDate;
+    Date nextQ2;
+    Date nextQ3;
+    Date nextQ4; 
+    Decimal workingQuarterDec;
+    Integer workingQuarter;
+    Integer workingYear;
+    Integer QM1, QM2, QM3, QM4;
+    Integer YM1, YM2, YM3, YM4;
+    Integer QF1, QF2, QF3, QF4;
+    Integer YF1, YF2, YF3, YF4;
+   
+    public String nameQM1 {get; set; }
+    public String nameQM2 {get; set; }
+    public String nameQM3 {get; set; }
+    public String nameQM4 {get; set; }
+ 
+    // rep variables
+    public string selectedRep {get; set;}
+    string currentUserName;
+    List<string> repNameList;
+    List<User> userList;
+    public List<SelectOption> repNameOptionList {get; set;}
+    Map<String, Id> repNameMap = new Map<String, Id>();
+    List<string> UserIdList;
+    List<string> allUserList = new List<string>();
+	PivotForecast_CLASS.PeriodWrapper pWrapper;    
+    public string goalString {get; set;}
+    public boolean year1view {get; set;}
+    public boolean year2view {get; set;}
+    public boolean oppView {get; set;}
+    public boolean forecastview {get; set;}
+    public boolean YoYView {get; set;}
+    public boolean FoYView {get; set;}
+    public string hideString {get; set;}
+    public boolean editView {get; set;}
+    public boolean noAccountsView {get; set;}
+    public integer inputWidth {get; set;}
+    public string colWidth {get; set;}
+    public string spaceWidth {get; set;}
+                public List<Rep_Goal__c> repGoalList {get; set;}
+    
+    set<String> regionPickList = new set<string>();
+    public Integer limitVar {get; set; } // sets the number of rows limit in a query
+    
+    public AccountForecast_Class() {  // constructor
+        selectedRep =    UserInfo.getUserId(); // UserInfo.getUserId();  // '00550000001jAWGAA2'
+        currentUserName =   UserInfo.getName();   // UserInfo.getName();  // 'Michael Pecoraro'
+        SORT_BY = 'Forecast Total';
+        year1view = true;
+        year2view = true;
+        forecastView = true;
+        oppView = false;
+        YoYView = false;
+        FoYView = false;
+        editView = false;
+		limitVar = 25;
+        colWidth = '4%';
+        inputWidth = 4;
+        
+        spaceWidth = '1px';
+        startForecast = new account_forecast__c(Forecast_Quarter__c = workingDate);
+        UserIdList = new List<string>();
+        summaryRowList = new List<string>{'Gap Totals', 'Goal Totals', 'Account Totals' };
+        startOfQuarter = [Select startDAte From Period Where type = 'Quarter' and StartDate = THIS_FISCAL_QUARTER].startdate;
+        startofQuarter = startOfQuarter - 80;
+        startOfQuarter = startOfQuarter.toStartOfMonth();
+        
+        Schema.describeFieldResult fieldResult = Account.region__c.getDescribe();
+        List<Schema.PicklistEntry> ple = fieldResult.getPickListValues();
+        for (Schema.PicklistEntry pick : ple) {
+            regionPickList.add(pick.getValue());
+        } 
+        // add all users that own an account into the user picklist
+        List<AggregateResult> aggAcctList = [SELECT owner.name owner FROM Account Group BY owner.name];
+        system.debug('aggAcctList ' + aggAcctList);
+		repNameList = new List<string>();
+        for (AggregateResult agg:aggAcctList) {
+            String name = (string)agg.get('owner');
+            repNameList.add(name);
+        }        
+
+        userList = [SELECT name, firstname, lastname, Id FROM User WHERE name IN:repNameList]; 
+        repNameOptionList = new List<SelectOption>();
+        repNameOptionList.add(new SelectOption('All', 'All') );
+        for (User u:userList){
+            repNameMap.put(u.name, u.id);
+            repNameOptionList.add(new SelectOption(u.name, u.name));  // value, label
+            allUserList.add(u.id);
+         }  
+        for (String s :regionPickList) {
+            repNameOptionList.add(new SelectOption(s, s));
+            
+        }
+              
+        if(currentUserName == 'All') {
+            for(String rep:RepNameList) {
+                if (repNameMap.get(rep) != NULL) {UserIdList.add(repNameMap.get(rep) );}
+                
+            }
+        } else {  }
+
+        userIdList.add(selectedRep);
+        selectedRep = UserInfo.getName();  //UserInfo.getName();
+        
+		refreshAction();
+
+        
+        
+    } // end the constructor
+
+
+    
+    public void initializeVariables() { //initialize varables
+        repGoalList = new List<Rep_Goal__c>();
+        forecastYearMap = new map<string, date>();
+        periodYearList = new List<string>();
+        acctMap = new map<id, account>();
+        year1List = new List<string>();
+        year2List = new List<string>();
+        accountSalesOppSet = new List<id>();
+        accountSalesVASet = new List<id>();        
+        growthList = new List<string>();
+        YoYCompareMap = new map<string, string>();
+        growthList.add('P1Growth');
+        growthList.add('P2Growth');
+        growthList.add('P3Growth');
+        growthList.add('P4Growth');
+        growthList.add('YoY Growth');
+        noAccountsView = false;
+        partialRowList = new List<PivotForecast_CLASS.PivotRowWrapper>();
+        completeRowList = new List<CompleteRowWrapper>();
+        summaryRowMap = new map<string, SummaryRowWrapper>();
+        sortList = new List<SortWrapper>();
+        oppRowMap = new map<id, PivotForecast_CLASS.PivotRowWrapper>();
+        forecastCompareMap = new map<string, string>();
+        
+        
+    }  // end the initialize varables
+
+    public void generateAcctList() {
+        
+        If(selectedRep == 'All') {
+            acctList = [SELECT Name, ID, Sales_Data_Type__c, account_forecasting__c, owner.firstname FROM Account where account_forecasting__c = true];
+        }        
+        
+        if (regionPickList.contains(selectedRep)) 
+        {
+            acctList  = [SELECT Id, name, Sales_Data_Type__c, account_forecasting__c, region__c, owner.firstname FROM Account WHERE region__c =:selectedRep AND account_forecasting__C = true];
+        } 
+        else if (selectedRep != 'All')
+        {         
+            acctList = [SELECT Name, ID, Sales_Data_Type__c, account_forecasting__c, owner.firstname FROM Account where ownerID IN:userIDList AND account_forecasting__C = true];
+        }
+        system.debug('selectedRep = ' + selectedRep + ' acctList = ' + acctList);
+        if (acctList.isEmpty()) { noAccountsView = true;}
+        acctMaP.putAll(acctList);
+        system.debug('**1  acctList = ' + acctList);
+      
+    }    // end the generate account List
+
+    public void generateoppList() {
+        // get dates
+        system.debug('*** at start date = ' + startOfQuarter);
+        pWrapper = PivotForecast_CLASS.generatePeriodData('Quarterly', 9, startOfQuarter, 'subtract');
+        periodYearList = pWrapper.periodYearList;
+        periodYearList.sort();
+        year1List .add(periodYearList.get(0));
+        year1List .add(periodYearList.get(1));
+        year1List .add(periodYearList.get(2));
+        year1List .add(periodYearList.get(3));   
+        year2List .add(periodYearList.get(4)); 
+        YoYCompareMap.put(periodYearList.get(4),periodYearList.get(0) );
+        year2List .add(periodYearList.get(5)); 
+        YoYCompareMap.put(periodYearList.get(5),periodYearList.get(1) );
+        year2List .add(periodYearList.get(6));  
+        YoYCompareMap.put(periodYearList.get(6),periodYearList.get(2) );
+        year2List .add(periodYearList.get(7));  
+        YoYCompareMap.put(periodYearList.get(7),periodYearList.get(3) );
+        lastPeriodDate = pWrapper.lastDate;
+
+        system.debug('selectedRep = ' + selectedRep);
+        
+
+        for (Account acct:acctList) {
+            if(acct.Sales_Data_Type__c == 'Opportunity') {
+                accountSalesOppSet.add(acct.id);
+                
+            }
+            if (acct.Sales_Data_Type__c == 'VA Sales Data') {
+                accountSalesVASet.add(acct.id);
+            }
+            //allAccountMap.put(acct.Id, acct);
+        }
+        System.debug('Account Sales Opp set = ' + accountSalesOppSet);
+        system.debug('AccountSaleHistory *** userIdList = ' + userIdList);
+                List<AggregateResult> salesAggResult = 
+            [SELect sum(Amount) totalAmount, account.name varName, CALENDAR_YEAR(closedate) year, CALENDAR_QUARTER(closedate) period, accountId 
+             FROM Opportunity WHERE  StageName='W. Win' AND closedate > :lastPeriodDate AND (account.id IN :accountSalesOppSet)
+             GROUP BY CALENDAR_YEAR(closedate),  CALENDAR_QUARTER(closedate), account.name, accountId ORDER BY accountId  DESC]; 
+        
+        system.debug('first salesAggResult = ' + salesAggResult);
+        PivotForecast_CLASS.PivotRowAndTimeWrapper rowAndTimeWrapper;
+         PeriodYearSet.addAll(periodYearList);
+        if(!salesAggResult.isEmpty()) {    
+        rowAndTimeWrapper = PivotForecast_CLASS.pivotTimeSeries(salesAggResult, periodYearSet);
+        partialRowList = rowAndTimeWrapper.wrapper;
+        }
+        
+        salesAggResult = [SELECT account__r.account_forecasting__c forecastCheckBox,  
+                          account__r.name varName, sum(Revenue__c) totalAmount, 
+                          CALENDAR_QUARTER(date__c) period, CALENDAR_YEAR(date__c) year, Account__c accountID FROM Sales_Data__c
+                          WHERE date__c >:lastPeriodDate AND Revenue__C != NULL AND account__C IN:accountSalesVASet
+                         GROUP By account__r.account_forecasting__c, account__r.name, CALENDAR_QUARTER(date__c), 
+                          CALENDAR_YEAR(date__c), Account__c  Order By Account__c  DESC ];
+                        
+        if(!salesAggResult.isEmpty()) {
+        rowAndTimeWrapper = PivotForecast_CLASS.pivotTimeSeries(salesAggResult, periodYearSet);
+        partialRowList.addAll(rowAndTimeWrapper.wrapper); // add the va sales data
+        }      
+        if (partialRowList.isEmpty()) { noAccountsView = true;}
+    }  // end the generate sales data list
+    
+    public void generateReport() {
+       
+// setup the forecast
+// get the forcast query and add it to our partialrow list
+        date adjStartofQuarter = (startofQuarter+100).toStartOfMonth();
+        
+         pWrapper = PivotForecast_CLASS.generatePeriodData('Quarterly', 5, adjStartofQuarter, 'add');
+        endForecastDate = pWrapper.lastDate;
+        endForecastDate = endForecastDate - 80;
+        endForecastDate = endForecastDate.toStartOfMonth();
+        forecastYearList = pWrapper.periodYearList;
+        forecastYearMap = pWrapper.periodYearMap;
+        startForecastDate = startOfQuarter;
+        system.debug('AccountForecastClass - Forecastsection - forecastYearMap = ' + forecastYearMap);
+        system.debug('periodYEarList' + periodYearList);
+        periodYearList.addAll(pWrapper.periodYearList);
+        // create the forecast compare map
+        Integer i = 0;
+        for (string period:year2List) {
+            forecastCompareMap.put(period, forecastYearList.get(i));
+            i++;
+        }
+        
+        Map<Id, map<string, Account_Forecast__c>> acctForecastMap = new Map<Id, map<string, Account_Forecast__c>>();
+        
+        List<Account> acctForcastList = [SELECT id, name, account_forecasting__c, owner.firstname,
+                               (SELECT Id, account__r.name, Forecast_Quarter__c, Forecast_Revenue__c FROM Account_Forecasts__r  
+                               WHERE Forecast_Quarter__C >= :adjStartofQuarter AND Forecast_Quarter__C < :endForecastDate ORDER By Forecast_Quarter__c ASC) 
+                               FROM Account WHERE id IN:acctList ]; 
+
+        
+            // process the account forecasts and add them to the partialrowlist
+         for(Account acct: acctForcastList) 
+         { // create a map of accounts and their forecasts
+                //OwnerMap.put(acct.id, acct.owner.firstname);
+                Map<string, Account_Forecast__c> forecastMap = new Map<String, Account_Forecast__c>();
+                for (Account_Forecast__c aFor: acct.Account_Forecasts__r) 
+                {
+                    Integer qtr = Decimal.valueOf(aFor.Forecast_Quarter__c.month()).divide(3.0, 0, System.RoundingMode.UP).intValue();
+                    Integer year = aFor.Forecast_Quarter__c.year();
+                    String qtrYear = ''+ year + '-' + qtr;                
+                    forecastMap.put(qtrYear, aFor);
+                }
+                acctForecastMap.put(acct.Id, forecastMap);
+          }  
+            for (account acct :acctList) // loop through the accounts of the acctforecast map, and put blank forecasts where there are no forecasts   Id acctID :acctForecastMap.keyset()
+            { 
+                Map<string, Account_Forecast__c> forecastMap = new Map<String, Account_Forecast__c>();
+                if (!acctForecastMap.containsKey(acct.id)) { acctForecastMap.put(acct.id, new map<string, account_forecast__c>() ); }
+                forecastMap = acctForecastMap.get(acct.Id);
+                for (string period:forecastYearMap.keyset()) 
+                {
+                    if(!forecastMap.containsKey(period)) { forecastMap.put(period, new Account_Forecast__c(account__c = acct.Id, Forecast_Revenue__c = 0, Forecast_Quarter__c = forecastYearMap.get(period))); }
+                }
+            }  
+        	system.debug('acctForecastMap ' + acctForecastMap);
+//  get the opportunity forecast
+
+        List<AggregateResult> salesAggResult = [SELect sum(Amount) totalAmount, account.name varName, CALENDAR_YEAR(closedate) year, CALENDAR_QUARTER(closedate) period, accountId 
+             FROM Opportunity WHERE  closedate >= :adjStartofQuarter AND closedate < :endForecastDate AND (account.id IN :acctList) 
+             AND Probability  > 0 AND Probability < 100 AND Amount != 0 AND Amount != NULL
+             GROUP BY CALENDAR_YEAR(closedate),  CALENDAR_QUARTER(closedate), account.name, accountId ORDER BY accountId  DESC]; 
+            
+     system.debug('start of quarter' + adjStartofQuarter + ' endForecastDate' + endForecastDate + '  opp salesAggResult ' + salesAggResult);
+      PivotForecast_CLASS.PivotRowAndTimeWrapper rowAndTimeWrapper = PivotForecast_CLASS.pivotTimeSeries(salesAggResult, NULL);  
+      oppRowList = rowAndTimeWrapper.wrapper;  
+        for (PivotForecast_CLASS.PivotRowWrapper wrapper: oppRowList) {
+            oppRowMap.put(wrapper.accountId, wrapper);
+        }
+        
+		system.debug('oppRowMap ' + oppRowMap);
+
+// prepare the summaryRowList
+        try 
+        {
+            map<string, decimal> year1Map = new map<string,decimal>();
+            map<string, decimal> year2Map = new map<string, decimal>();
+            Map<string, decimal> oppMap = new Map<String, decimal>();
+            Map<string, decimal> forecastMap = new Map<String, decimal>();
+            map<string, decimal> YoYGrowthMap = new Map<string, decimal>();
+            map<string, decimal> FoYGrowthMap = new Map<string, decimal>();
+            decimal year1Total = 0;
+            decimal year2Total = 0;
+            decimal forecastTotal = 0;
+           
+            for(string year1: year1List) 
+            {
+                year1Map.put(year1, 0);
+            } 
+            for(string year2: year2List) 
+            {
+                year2Map.put(year2, 0);
+                YoYGrowthMap.put(year2, 0);
+            } 
+            for (string s :forecastYearList) 
+            {
+				oppMap.put(s, 0);
+            }
+            for (string s :forecastYearList) 
+            {
+				forecastMap.put(s, 0);
+            }
+		 	accountTotal = new SummaryRowWrapper(NULL, NULL, NULL, 
+                                                 year1Map, 0,
+                                                 year2Map, 0,
+                                                 oppMap, 0,
+                                                 forecastMap, 0,
+                                                 YoYGrowthMap, 0,
+                                                 FoYGrowthMap, 0) ;            
+            
+        } catch (exception e) {system.debug (e);}
+
+// add any accounts from the acctList that are missing in the partialRowList
+		set<id> partialAcctSet = new set<id>();
+        for (PivotForecast_CLASS.PivotRowWrapper wrapper :partialRowList) 
+        {
+        	partialAcctSet.add(wrapper.accountId);    
+        }
+            map<string, decimal> amountMapZero = new map<string, decimal>();
+            for (string period:periodYearList) {
+                amountMapZero.put(period, 0);
+            }        
+        for (account acct:acctList) {
+
+            if (!partialAcctSet.contains(acct.Id))
+            {
+             	partialRowList.add(new PivotForecast_CLASS.PivotRowWrapper(acct.name, acct.id, amountMapZero, 0));   
+            }    
+        }
+
+        
+//  add everything together and create the completerowlist and sort it
+        for (PivotForecast_CLASS.PivotRowWrapper wrapper :partialRowList) {
+            map<string, decimal> year1Map = new map<string,decimal>();
+            map<string, decimal> year2Map = new map<string, decimal>();
+            map<string, decimal> oppMap = new map<string, decimal>();
+            Map<string, Account_Forecast__c> forecastMap = new Map<String, Account_Forecast__c>();
+            map<string, decimal> YoYGrowthMap = new map<string, decimal>();
+            map<string, decimal> forecastGrowthMap = new map<string, decimal>();
+            decimal year1Total = 0;
+            decimal year2Total = 0;
+            decimal forecastTotal = 0;
+            decimal oppTotal = 0;
+            decimal YoYGrowthTotal = 0;
+            decimal forecastGrowthTotal = 0;
+            forecastMap = acctForecastMap.get(wrapper.accountId);  
+            system.debug('wrapper = ' + wrapper);
+            system.debug('*** accountMap = ' + acctMap.get(wrapper.accountId) );
+            boolean forecastCheckBox = acctMap.get(wrapper.accountId).account_forecasting__c;
+            string owner = acctMap.get(wrapper.accountId).owner.firstname;
+
+            for(string period: year1List) 
+            {
+                decimal amount = wrapper.amountMap.get(period);
+                year1Map.put(period, amount);
+                year1Total += amount;
+                decimal colSum = accountTotal.year1Map.get(period);
+                colSum += amount;
+                accountTotal.year1Map.put(period, colSum);
+            }
+            for(string period: year2List) 
+            {
+                decimal amount = wrapper.amountMap.get(period);
+                year2Map.put(period, amount);
+                year2Total += amount;
+                decimal colSum = accountTotal.year2Map.get(period);
+                colSum += amount;   
+                accountTotal.year2Map.put(period, colSum);
+                
+                // calculate the change YoY
+                string lastYear = YoYCompareMap.get(period);
+                decimal growth;
+                if(year1Map.get(lastYear) == 0 || year1Map.get(lastYear) == NULL)  { growth = 0;}  else { growth = (amount / year1Map.get(lastYear)-1);}
+                YoYGrowthMap.put(period, growth);
+                
+            } 
+            if (year1Total != 0 ) YoYGrowthTotal = year2Total/year1Total-1;
+            
+            // opp map
+            for (string period:forecastYearList) {
+                decimal amount = 0;
+                if (oppRowMap.containsKey(wrapper.accountId)) { //system.debug(oppRowMap.get(wrapper.accountId)); 
+                }
+                if (oppRowMap.containsKey(wrapper.accountId) && oppRowMap.get(wrapper.accountId).amountMap.containsKey(period)) 
+                { 
+                    amount = oppRowMap.get(wrapper.accountId).amountMap.get(period);
+                    
+                }   
+                oppMap.put(period, amount);
+                oppTotal += amount;
+                decimal colSum = accountTotal.oppMap.get(period);
+                colSum += amount;   
+                accountTotal.oppMap.put(period, colSum);
+               
+            }
+            
+           
+            // forecast map
+            for (string period :forecastYearList) {
+                decimal revenue = 0;
+                try { revenue = forecastMap.get(period).forecast_revenue__c; } catch (exception e) { revenue = 0;}
+                if (revenue == NULL) { revenue = 0;}
+                decimal amount = revenue;
+                forecastTotal += amount;
+                decimal colSum = accountTotal.forecastMap.get(period);
+                colSum += amount;   
+                accountTotal.forecastMap.put(period, colSum);
+            }
+            // forecast growth map
+            for (string period:year2List) {
+                string forcastQtr = forecastCompareMap.get(period);
+                decimal yearAmount = year2Map.get(period);
+                decimal forecastAmount = 0;
+                forecastAmount = forecastMap.get(forcastQtr).Forecast_Revenue__c;
+                decimal growth = 0;
+                if (yearAmount != 0) { growth = forecastAmount/yearAmount -1;}
+                forecastGrowthMap.put(period,growth);
+            }
+            if (year2Total != 0) { forecastGrowthTotal = forecastTotal / year2Total -1; }
+			accountTotal.year1Total += year1Total;
+            accountTotal.year2Total += year2Total;
+            accountTotal.oppTotal += oppTotal;
+            accountTotal.forecastTotal += forecastTotal;
+            
+            sortList.add(new SortWrapper(new CompleteRowWrapper (wrapper.name, wrapper.accountId, owner, forecastCheckBox,
+                                                                 year1Map, year1Total, 
+                                                                 year2Map, year2Total, 
+                                                                 oppMap, oppTotal, 
+                                                                 forecastMap, forecastTotal,
+                                                                YoYGrowthMap, YoYGrowthTotal, 
+                                                                forecastGrowthMap, forecastGrowthTotal)));
+         } // end the for
+        system.debug('account Total = ' + accountTotal);
+        summaryRowMap.put('Account Totals', accountTotal);
+        sortList.sort();
+        for (SortWrapper sorted:sortList) {
+            CompleteRowList.add(sorted.wrapper);
+        }
+    } // end the generateAccount method
+
+// generate Rep Goal method     
+    private void generateRepGoalQuery() {
+
+        if (selectedRep == 'All') {
+        	repGoalList = [SELECT Total_Revenue__c, User__c, Goals__r.Start_Date_of_new_Quarter__c FROM rep_goal__c 
+ 						WHERE User__c IN :allUserList AND (
+                        Goals__r.Start_Date_of_new_Quarter__c >= :startForecastDate AND Goals__r.Start_Date_of_new_Quarter__c < :endForecastDate  ) 
+                      ];                             
+        }
+        
+        if (regionPickList.contains(selectedRep)) {
+            repGoalList = [SELECT Total_Revenue__c, User__c, Goals__r.Start_Date_of_new_Quarter__c FROM rep_goal__c WHERE region__c = :selectedRep];
+        } else if (selectedRep != 'ALL') {
+               repGoalList = [SELECT Total_Revenue__c, User__c, Goals__r.Start_Date_of_new_Quarter__c FROM rep_goal__c 
+                       WHERE User__c IN :UserIdList AND (
+ 						Goals__r.Start_Date_of_new_Quarter__c >= :startForecastDate AND Goals__r.Start_Date_of_new_Quarter__c < :endForecastDate  ) 
+                      ];  
+        }
+        
+        
+        system.debug('userIdList ' + userIdList + 'rep goals = ' + repGoalList);
+    }   // end the Rep Goal method 
+ 
+// generate Goal Summary method    
+    private void generateGoalSummary() {
+        Decimal goalTotal = 0;  
+        decimal YoYTotal = 0;
+        decimal FoYTotal = 0;
+        map<string, decimal> forecastMap = new map<string, decimal>();
+        map<string, decimal> YoYGrowthMap = new map<string, decimal>();
+        map<string, decimal> forecastGrowthMap = new map<string, decimal>();
+		SummaryRowWrapper goalRowTotal = new SummaryRowWrapper(NULL, NULL, NULL,
+                                          NULL, NULL,
+                                          NULL, NULL,
+                                          NULL, NULL,
+                                          forecastMap, goalTotal,
+                                          NULL, NULL,
+                                          NULL, NULL );
+        
+        //generate YoY comparisons and put in the map
+        for (string period2: year2List) {
+            string period1 = YoYCompareMap.get(period2);
+            decimal growthAmount = 0;
+            decimal year1Amount = SummaryRowMap.get('Account Totals').year1Map.get(period1);
+            decimal year2Amount = SummaryRowMap.get('Account Totals').year2Map.get(period2);
+            if (year1Amount != 0) { growthAmount = year2Amount / year1Amount-1;}
+            YoYGrowthMap.put(period2, growthAmount);
+         }
+        SummaryRowMap.get('Account Totals').YoYGrowthMap.putAll(YoYGrowthMap);
+        decimal year1Total = SummaryRowMap.get('Account Totals').year1Total;
+        decimal year2Total = SummaryRowMap.get('Account Totals').year2Total;
+        if (year1Total != 0 && year1Total != NULL) { YoYTotal = year2Total / year1Total -1;}
+        SummaryRowMap.get('Account Totals').YoYGrowthTotal = YoYTotal;
+        
+        // cycle through forecasts and add zero's and totals
+        for (string period:forecastYearList ) 
+        {
+            decimal goalSum= 0;
+            if (repGoalList.isEmpty()) { goalRowTotal.forecastMap.put(period, goalSum);}
+            else 
+            {            
+                for (Rep_Goal__c goal:repGoalList)
+                {
+                    Integer qtr = Decimal.valueOf(goal.Goals__r.Start_Date_of_new_Quarter__c.month()).divide(3.0, 0, System.RoundingMode.UP).intValue();
+                    Integer year = goal.Goals__r.Start_Date_of_new_Quarter__c.year();  
+                    string qtrYear = '' + year + '-' + qtr;  
+                    if (period == qtrYear) 
+                        { 
+                            decimal amount = goal.Total_Revenue__c;
+                            if (amount == NULL) { amount = 0;}
+                            goalSum += amount;
+                            goalTotal += amount;
+                        }
+                    goalRowTotal.forecastMap.put(period, goalSum);
+                 }
+            } // end else
+        } // end for
+        
+		// generate the FoY comparisons
+        for (string period2: year2List) {
+        	string forecastQtr = forecastCompareMap.get(period2);
+			decimal year2Amount = SummaryRowMap.get('Account Totals').year2Map.get(period2);
+			decimal forecastAmount = SummaryRowMap.get('Account Totals').forecastMap.get(forecastQtr);
+            decimal growthAmount = 0;
+            if (year2Amount != 0 && year2Amount != NULL) { growthAmount = (forecastAmount / year2Amount) -1;}
+            forecastGrowthMap.put(forecastQtr, growthAmount);
+            system.debug('*** period2 ' + period2 + ' forecastQtr ' + forecastQtr + ' year2Amount= ' + year2Amount + 'forecastAmount= ' + forecastAmount + ' growthAmount=' + growthAmount);
+        }
+        SummaryRowMap.get('Account Totals').forecastGrowthMap.putAll(forecastGrowthMap);
+        decimal forecastTotal = SummaryRowMap.get('Account Totals').forecastTotal;
+        if (year2Total != 0 && year2Total != NULL) { FoYTotal = (forecastTotal/year2Total) -1;}
+		SummaryRowMap.get('Account Totals').forecastGrowthTotal = FoYTotal;       
+        
+        
+        
+        system.debug('forecastMap = ' + goalRowTotal);
+        goalRowTotal.forecastTotal = goalTotal;
+        summaryRowMap.put('Goal Totals', goalRowTotal);
+
+        
+        map<string, decimal> gapMap = new map<string, decimal>();
+        decimal gapTotal = 0;
+        for (string period:forecastYearList) {
+            system.debug(summaryRowMap.get('Goal Totals'));
+            system.debug(summaryRowMap.get('Account Totals'));
+            
+            decimal gap = summaryRowMap.get('Goal Totals').forecastMap.get(period) - summaryRowMap.get('Account Totals').forecastMap.get(period);
+            gapMap.put(period, gap);
+            
+        } 
+        gapTotal = summaryRowMap.get('Goal Totals').forecastTotal - summaryRowMap.get('Account Totals').forecastTotal;
+        summaryRowMap.put('Gap Totals', new SummaryRowWrapper(NULL, NULL, NULL,
+                                                             NULL, NULL,
+                                                             NULL, NULL,
+                                                             NULL, NULL,
+                                                             gapMap, gapTotal,
+                                                             NULL, NULL,
+                                                             NULL, NULL)); 
+        
+      system.debug('Summary *** '  +summaryRowMap);  
+    } // end the goal summary method
+
+    public void refreshAction() {
+        initializeVariables();
+        generateAcctList();
+        generateoppList();
+        system.debug('*** noAccountsView' + noAccountsView);
+        if (noAccountsView == false) {
+            generateReport();
+            generateRepGoalQuery();
+            generateGoalSummary(); 
+            numOfAccounts();
+        }
+   
+    }    
+
+    public void selectedRepAction() {
+        userIdList = new List<string>();
+        userIdList.add(RepNameMap.get(selectedRep) );
+        refreshAction();
+
+    }
+    
+    public void HideUnhide() {
+        system.debug('hidestring = ' +hideString + ' year1view = ' + year1View);
+        if (hideString == 'year1' &&  year1View == true) { year1View = false;} else if (hideString == 'year1' &&  year1View == false) {year1View = true;}
+        if (hideString == 'year2' &&  year2View == true) { year2View = false;} else if (hideString == 'year2' &&  year2View == false) {year2View = true;}  
+        if (hideString == 'opp' &&  oppView == true) { oppView = false;} else if (hideString == 'opp' &&  oppView == false) {oppView = true;}         
+        if (hideString == 'forecast' &&  forecastView == true) { forecastView = false;} else if (hideString == 'forecast' &&  forecastView == false) {forecastView = true;}
+        if (hideString == 'YoY' &&  YoYView == true) { YoYView = false;} else if (hideString == 'YoY' &&  YoYView == false) {YoYView = true;}
+        if (hideString == 'FoY' &&  FoYView == true) { FoYView = false;} else if (hideString == 'FoY' &&  FoYView == false) {FoYView = true;}
+		refreshAction();
+    }
+    
+    public void selectedDateAction() {   
+         startOfQuarter = startForecast.Forecast_Quarter__c;
+        List<period> periodList = [Select startDAte From Period Where type = 'Quarter' and StartDate <= :startOfQuarter];
+        startOfQuarter = periodList.get(periodList.size()-1).startdate;
+        startofQuarter = startOfQuarter - 80;
+        startOfQuarter = startOfQuarter.toStartOfMonth();        
+        refreshAction();
+    }
+
+    public void edit() {
+        if (editView == false) { editView = true; } else {editView = false;}
+    }  
+    
+    public void save() {
+        List<Account> acctList = new List<Account>();
+        List<Account_Forecast__c> forecastList = new List<Account_Forecast__c>();
+        for (CompleteRowWrapper wrapper:completeRowList) {
+           Account acct = new Account(id=wrapper.acctId);
+            acctList.add(acct);
+           for (Account_Forecast__c wrap :wrapper.forecastMap.values()) {
+               Account_Forecast__C forecast = new Account_Forecast__c();
+               forecast.Forecast_Revenue__c = wrap.Forecast_Revenue__c;
+               forecast.Account__c = wrapper.acctId;
+               forecast.Forecast_Quarter__c = wrap.Forecast_Quarter__c;
+               if (wrap.id != NULL) { forecast.ID = wrap.id;}
+
+                  forecastList.add(forecast);
+           }
+        }
+        system.debug('AccountGoals_Class ***  forecastList  = ' + forecastList);
+        upsert(forecastList);
+            upsert(acctList);        
+    }
+
+	public void numOfAccounts() {
+        List<CompleteRowWrapper> newRowList = new List<CompleteRowWrapper>();
+        integer adjLimitVar =0;
+        if (limitVar > CompleteRowList.size()) { adjLimitVar = completeRowList.size();} else { adjLimitVar = limitVar;}
+        for (integer i = 0; i  < adjLimitVar; i++ ) {
+            newRowList.add(CompleteRowList.get(i));
+        }
+        CompleteRowList = newRowList;
+    }
+
+    
+    public class CompleteRowWrapper {
+        public string acctName {get; set;}
+        public string acctId {get; set;}
+        public string ownerName {get; set;}
+        public boolean forecastCheckBox {get; set;}
+        public map<string, decimal> year1Map {get; set;}
+        public decimal year1Total {get; set;}
+        public map<string, decimal> year2Map {get; set;}
+        public decimal year2Total {get; set;}
+        public map<string, decimal> oppMap {get; set;}
+        public decimal oppTotal {get; set;}        
+        public Map<string, Account_Forecast__c> forecastMap {get; set;}
+        public decimal forecastTotal {get; set;}  
+        public map <string, decimal> YoYGrowthMap {get; set;} // uses year2 dates as map 
+        public decimal YoYGrowthTotal {get; set;}
+        public map <string, decimal> forecastGrowthMap{get; set;}
+        public decimal forecastGrowthTotal {get; set;}
+        
+        
+        public CompleteRowWrapper(string acctName, string acctId, string ownerName, boolean forecastCheckBox,
+                                  map<string, decimal> year1Map, decimal year1Total,
+                                  map<string, decimal> year2Map, decimal year2Total,
+                                  map<string, decimal> oppMap, decimal oppTotal,
+                                  Map<string, Account_Forecast__c> forecastMap, decimal forecastTotal,
+                                  map<string, decimal> YoYGrowthMap, decimal YoYGrowthTotal,
+                                  map<string, decimal> forecastGrowthMap, decimal forecastGrowthTotal) 
+        {
+                                      
+            this.acctName = acctName;
+            this.acctId = acctId;
+            this.ownerName = ownerName;
+            this.forecastCheckBox = forecastCheckbox;
+            this.year1Map = year1Map;
+            this.year1Total = year1Total;
+            this.year2Map = year2Map;
+            this.year2Total= year2Total;
+            this.oppMap = oppMap;
+            this.oppTotal = oppTotal;
+            this.forecastMap = forecastMap;
+            this.forecastTotal = forecastTotal;
+            this.YoYGrowthMap = YoYGrowthMap;
+            this.YoYGrowthTotal = YoYGrowthTotal;
+            this.forecastGrowthMap = forecastGrowthMap;
+            this.forecastGrowthTotal = forecastGrowthTotal;
+
+        }
+
+    } // ends the complete row wrapper
+
+    public class SummaryRowWrapper {
+        public string acctName {get; set;}
+        public string acctId {get; set;}
+        public string ownerName {get; set;}
+        public map<string, decimal> year1Map {get; set;}
+        public decimal year1Total {get; set;}
+        public map<string, decimal> year2Map {get; set;}
+        public decimal year2Total {get; set;}
+        public map<string, decimal> oppMap {get; set;}
+        public decimal oppTotal {get; set;}        
+        public Map<string, decimal> forecastMap {get; set;}
+        public decimal forecastTotal {get; set;}  
+        public map <string, decimal> YoYGrowthMap {get; set;} // uses year2 dates as map 
+        public decimal YoYGrowthTotal {get; set;}
+        public map <string, decimal> forecastGrowthMap{get; set;}
+        public decimal forecastGrowthTotal {get; set;}       
+        
+        public SummaryRowWrapper(string acctName, string acctId, string ownerName, 
+                                  map<string, decimal> year1Map, decimal year1Total,
+                                  map<string, decimal> year2Map, decimal year2Total,
+                                  map<string, decimal> oppMap, decimal oppTotal,
+                                  Map<string, decimal> forecastMap, decimal forecastTotal,
+                                  map<string, decimal> YoYGrowthMap, decimal YoYGrowthTotal,
+                                  map<string, decimal> forecastGrowthMap, decimal forecastGrowthTotal)                                  
+        {
+                                      
+            this.acctName = acctName;
+            this.acctId = acctId;
+            this.ownerName = ownerName;
+            this.year1Map = year1Map;
+            this.year1Total = year1Total;
+            this.year2Map = year2Map;
+            this.year2Total= year2Total;
+            this.oppMap = oppMap;
+            this.oppTotal = oppTotal;
+            this.forecastMap = forecastMap;
+            this.forecastTotal = forecastTotal;
+            this.YoYGrowthMap = YoYGrowthMap;
+            this.YoYGrowthTotal = YoYGrowthTotal;
+            this.forecastGrowthMap = forecastGrowthMap;
+            this.forecastGrowthTotal = forecastGrowthTotal;
+
+        }
+
+    } // ends the complete row wrapper    
+    
+ 
+
+    public void SortAction() {
+        system.debug('sort by = ' +SORT_BY);
+        SORT_PREFIX = SORT_BY.substring(0, 3);
+        SORT_BY = SORT_BY.substring(3);
+        if (SORT_BY == LAST_SORT) { reverseNo = -1; system.debug('firing');} else {reverseNo = 1;}
+        system.debug('last sort = '+ LAST_SORT);
+        LAST_SORT = SORT_BY;
+        system.debug('last sort =  should change'+ LAST_SORT);
+		refreshAction();       
+        
+    }    
+    
+    public class SortWrapper implements Comparable {
+
+        public CompleteRowWrapper wrapper;
+        
+        // Constructor
+        public SortWrapper(CompleteRowWrapper wrapper) {
+            this.wrapper = wrapper;
+        }
+        
+        // Compare opportunities based on the opportunity amount.
+        public Integer compareTo(Object compareTo) {
+            
+            // Cast argument to SortWrapper
+            SortWrapper compareToWrapper = (SortWrapper)compareTo;
+            
+            Integer returnValue = 0;
+            // sort by year 1
+            if(SORT_PREFIX == 'YR1') {
+                if (wrapper.year1Map.containsKey(SORT_BY)) {
+                    // The return value of 0 indicates that both elements are equal.
+                    if (wrapper.year1Map.get(SORT_BY) < compareToWrapper.wrapper.year1Map.get(SORT_BY)) {
+                        // Set return value to a positive value.
+                        returnValue = 1;
+                    } else if (wrapper.year1Map.get(SORT_BY) > compareToWrapper.wrapper.year1Map.get(SORT_BY)) {
+                        // Set return value to a negative value.
+                        returnValue = -1;
+                    }
+                }
+            }
+            if(SORT_BY == 'Total Y1') {
+                if (wrapper.year1Total < compareToWrapper.wrapper.year1Total) {
+                    returnValue = 1;
+                } else if (wrapper.year1Total > compareToWrapper.wrapper.year1Total) {
+                    returnValue = -1;
+                }
+            }
+            
+            //year 2 sort
+			if(SORT_PREFIX == 'YR2') {
+            	if (wrapper.year2Map.containsKey(SORT_BY)) {
+                	// The return value of 0 indicates that both elements are equal.
+                    if (wrapper.year2Map.get(SORT_BY) < compareToWrapper.wrapper.year2Map.get(SORT_BY)) {
+                            // Set return value to a positive value.
+                            returnValue = 1;
+                    } else if (wrapper.year2Map.get(SORT_BY) > compareToWrapper.wrapper.year2Map.get(SORT_BY)) {
+                            // Set return value to a negative value.
+                            returnValue = -1;
+                    }
+                }   
+             }
+            if(SORT_BY == 'Total Y2') {
+                if (wrapper.year2Total < compareToWrapper.wrapper.year2Total) {
+                    returnValue = 1;
+                } else if (wrapper.year2Total > compareToWrapper.wrapper.year2Total) {
+                    returnValue = -1;
+                }
+            }
+            
+            //opportunity sort
+            if(SORT_PREFIX == 'OPP') {
+            	if (wrapper.oppMap.containsKey(SORT_BY)) {
+                    // The return value of 0 indicates that both elements are equal.
+                    if (wrapper.oppMap.get(SORT_BY) < compareToWrapper.wrapper.oppMap.get(SORT_BY)) {
+                        // Set return value to a positive value.
+                        returnValue = 1;
+                    } else if (wrapper.oppMap.get(SORT_BY)> compareToWrapper.wrapper.oppMap.get(SORT_BY)) {
+                        // Set return value to a negative value.
+                        returnValue = -1;
+                    }
+                }      
+            }
+            if(SORT_BY == 'Opp Total') {
+                if (wrapper.oppTotal < compareToWrapper.wrapper.oppTotal) {
+                    returnValue = 1;
+                } else if (wrapper.oppTotal > compareToWrapper.wrapper.oppTotal) {
+                    returnValue = -1;
+                }
+            }   
+            
+            // forecast sort
+            if(SORT_PREFIX == 'FOR') {
+            	if (wrapper.forecastMap.containsKey(SORT_BY)) {
+                    // The return value of 0 indicates that both elements are equal.
+                    if (wrapper.forecastMap.get(SORT_BY).Forecast_Revenue__c < compareToWrapper.wrapper.forecastMap.get(SORT_BY).Forecast_Revenue__c) {
+                        // Set return value to a positive value.
+                        returnValue = 1;
+                    } else if (wrapper.forecastMap.get(SORT_BY).Forecast_Revenue__c > compareToWrapper.wrapper.forecastMap.get(SORT_BY).Forecast_Revenue__c) {
+                        // Set return value to a negative value.
+                        returnValue = -1;
+                    }
+                }      
+            }
+            if(SORT_BY == 'Forecast Total') {
+                if (wrapper.forecastTotal < compareToWrapper.wrapper.forecastTotal) {
+                    returnValue = 1;
+                } else if (wrapper.forecastTotal > compareToWrapper.wrapper.forecastTotal) {
+                    returnValue = -1;
+                }
+            }            
+
+            // YoY Sort
+            if(SORT_PREFIX == 'YoY') {
+            	if (wrapper.YoYGrowthMap.containsKey(SORT_BY)) {
+                    // The return value of 0 indicates that both elements are equal.
+                    if (wrapper.YoYGrowthMap.get(SORT_BY) < compareToWrapper.wrapper.YoYGrowthMap.get(SORT_BY)) {
+                        // Set return value to a positive value.
+                        returnValue = 1;
+                    } else if (wrapper.YoYGrowthMap.get(SORT_BY) > compareToWrapper.wrapper.YoYGrowthMap.get(SORT_BY)) {
+                        // Set return value to a negative value.
+                        returnValue = -1;
+                    }
+                }      
+            }
+            if(SORT_BY == 'Total YoY') {
+                if (wrapper.YoYGrowthTotal < compareToWrapper.wrapper.YoYGrowthTotal) {
+                    returnValue = 1;
+                } else if (wrapper.YoYGrowthTotal > compareToWrapper.wrapper.YoYGrowthTotal) {
+                    returnValue = -1;
+                }
+            }   
+            
+            // FoY Sort
+            if(SORT_PREFIX == 'FoY') {
+                system.debug('SORT BY= ' + SORT_BY);
+            	if (wrapper.forecastGrowthMap.containsKey(SORT_BY)) {
+                    // The return value of 0 indicates that both elements are equal.
+                    if (wrapper.forecastGrowthMap.get(SORT_BY) < compareToWrapper.wrapper.forecastGrowthMap.get(SORT_BY)) {
+                        // Set return value to a positive value.
+                        returnValue = 1;
+                    } else if (wrapper.forecastGrowthMap.get(SORT_BY) > compareToWrapper.wrapper.forecastGrowthMap.get(SORT_BY)) {
+                        // Set return value to a negative value.
+                        returnValue = -1;
+                    }
+                }      
+            }
+            if(SORT_BY == 'Total FoY') {
+                if (wrapper.forecastGrowthTotal < compareToWrapper.wrapper.forecastGrowthTotal) {
+                    returnValue = 1;
+                } else if (wrapper.forecastGrowthTotal > compareToWrapper.wrapper.forecastGrowthTotal) {
+                    returnValue = -1;
+                }
+            }    
+
+            if(SORT_BY == 'Account') {  // reversed signs for strings
+                if (wrapper.acctName > compareToWrapper.wrapper.acctName) {
+                    returnValue = 1;
+                } else if (wrapper.acctName < compareToWrapper.wrapper.acctName) {
+                    returnValue = -1;
+                }
+            }              
+            
+            if(SORT_BY == 'Owner') {  // reversed signs for strings
+                if (wrapper.ownerName > compareToWrapper.wrapper.ownerName) {
+                    returnValue = 1;
+                } else if (wrapper.ownerName < compareToWrapper.wrapper.ownerName) {
+                    returnValue = -1;
+                }
+            }  
+            
+            returnValue = returnValue * reverseNo;
+            return returnValue;   
+//return (0);
+        }
+
+                } // end the sortable   
+    
+}
