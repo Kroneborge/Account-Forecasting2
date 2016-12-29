@@ -1,0 +1,364 @@
+<apex:page controller="AccountForecast_CLASS">
+  
+    
+    
+    <style type="text/css">    
+		.colSpace {background-color: lightgrey !important; color:grey !important; background-image:none !important}
+     	
+    </style>
+
+    
+    <apex:form >
+
+<!-- menu -->        
+        <apex:pageblock title="Account Quarterly Forecast (in calendar Qtrs)">
+            
+            <apex:pageblockbuttons location="top" >
+                <apex:commandButton action="{!save}" value="Save" /> 
+            	<apex:commandButton action="{!edit}" value="Edit" rendered="{!if(editView = false,true,false)}"/>   
+                <apex:commandButton action="{!edit}" value="Cancel" rendered="{!if(editView = true,true,false)}"/> 
+            </apex:pageblockbuttons>    
+            <apex:pageblocksection >
+                <apex:pageblocksectionItem >
+                    <apex:outputLabel for="repSelector" value="Rep Selector"/>
+                    <apex:selectList size="1" value="{!SelectedRep}" id="repSelector">
+                        <apex:selectOptions value="{!repNameOptionList}"/>
+                        <apex:actionSupport action="{!selectedRepAction}" event="onchange"/>
+                    </apex:selectList>
+                </apex:pageblocksectionItem>     
+                
+                <apex:pageblocksectionitem >
+                    <apex:outputlabel for="startdate" value="Start Date of Quarter:" />
+                    <apex:inputfield value="{!startForecast.Forecast_Quarter__c}" id="startdate"> 
+                        <apex:actionSupport event="onchange" action="{!selectedDateAction}" />
+                     </apex:inputfield>
+       			</apex:pageblocksectionitem>  
+                
+  			 <apex:pageblocksectionitem >
+                <apex:outputlabel for="numOfAccounts" value="Number of Accounts:" />
+                <apex:inputtext value="{!limitVar}" id="numOfAccounts">
+                    <apex:actionSupport event="onchange" action="{!refreshAction}" />
+                </apex:inputtext>           
+      	  </apex:pageblocksectionitem>
+                
+             </apex:pageblocksection>
+            
+
+        </apex:pageblock>
+        <apex:pageblock rendered="{!if(noAccountsView=true, true, false)}">
+            <apex:outputText >No accounts with account forecasting turned on</apex:outputText> 
+            
+            
+        </apex:pageblock>
+        <apex:pageBlock rendered="{!if(noAccountsView=false, true, false)}">
+<!-- Summary table -->			
+            	<apex:pageblocktable value="{!summaryRowList}" var="row" width="100%"  >
+                 <apex:column width="10%" >
+                    <apex:outputtext value="{!Row}"/>
+                </apex:column>
+                <apex:column width="5%">
+                    <apex:facet name="header">
+
+                    </apex:facet>
+                    <apex:outputtext />
+                </apex:column>                    
+                    
+                    
+<!-- year 1-->                    
+                <apex:repeat value="{!year1List}" var="period">
+                      <apex:column rendered="{!year1View}" width="{!colWidth}">
+                        <apex:facet name="header"  >{!period}
+                        </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].year1Map[period]}" /></apex:outputtext>
+                    </apex:column>
+            	 </apex:repeat> 
+
+                    <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Total Y1
+                                <apex:param value="year1"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                    </apex:commandlink>    						
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].year1Total}" /></apex:outputtext>
+                    </apex:column>                
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+<!-- year 2 -->                  
+                <apex:repeat value="{!year2List}" var="period">
+                      <apex:column rendered="{!year2View}" width="{!colWidth}">
+                        <apex:facet name="header">{!period}
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].year2Map[period]}" /></apex:outputtext>
+                    </apex:column>
+                    </apex:repeat>                       
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Totals Y2
+                                            <apex:param value="year2"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].year2Total}" /></apex:outputtext>
+                    </apex:column>                
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+<!-- opportunities -->
+                <apex:repeat value="{!forecastYearList}" var="period">
+                      <apex:column rendered="{!oppView}" width="{!colWidth}">
+                        <apex:facet name="header">{!period}
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].oppMap[period]}" /></apex:outputtext>
+                    </apex:column>
+                    </apex:repeat>                       
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Total Opps
+                                            <apex:param value="opp"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].oppTotal}" /></apex:outputtext>
+                    </apex:column>                
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->               
+
+<!-- forecast -->
+                <apex:repeat value="{!forecastYearList}" var="period">
+                      <apex:column rendered="{!forecastView}" width="{!colWidth}">
+                        <apex:facet name="header">{!period}
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].forecastMap[period]}" /></apex:outputtext>
+                    </apex:column>
+             </apex:repeat>                        
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Total Forecast
+                                            <apex:param value="forecast"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                            </apex:commandlink>  
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!summaryRowMap[row].forecastTotal}" /></apex:outputtext>
+                    </apex:column>                
+                 <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+                    
+<!-- YoY Growth -->                    
+                <apex:repeat value="{!year2List}" var="period">
+                      <apex:column width="{!colWidth}" rendered="{!YoYView}">
+                        <apex:facet name="header">{!period}
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!summaryRowMap[row].YoYGrowthMap[period]}" /></apex:outputtext>
+                    </apex:column>
+             </apex:repeat>                        
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Total YoY
+                                            <apex:param value="YoY"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                            </apex:commandlink>  
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!summaryRowMap[row].YoYGrowthTotal}" /></apex:outputtext>
+                    </apex:column>                
+                    <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->           
+<!-- FoY Growth -->                    
+                <apex:repeat value="{!forecastYearList}" var="period">
+                      <apex:column width="{!colWidth}" rendered="{!FoYView}">
+                        <apex:facet name="header">{!period}
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!summaryRowMap[row].forecastGrowthMap[period]}" /></apex:outputtext>
+                    </apex:column>
+             </apex:repeat>                        
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!HideUnhide}" >Total FoY
+                                            <apex:param value="FoY"  name="hideString" assignTo="{!hideString}" ></apex:param> 
+                            </apex:commandlink>  
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!summaryRowMap[row].forecastGrowthTotal}" /></apex:outputtext>
+                    </apex:column>                        
+					<apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->   
+
+                 <apex:column width="{!colwidth}">
+                      
+					<!-- forecast checkbox column  -->     
+                </apex:column>                   
+                  <apex:column />  <!-- end  column -->       
+                </apex:pageblocktable>
+            
+                  
+            <hr/>
+
+            
+            
+            
+<!-- account details **********************************************  -->            
+            <apex:pageblocktable value="{!completeRowList}" var="row">
+                <apex:column width="10%">
+                    <apex:facet name="header">
+                                <apex:commandlink action="{!sortAction}" value="Account Name" >    
+                                <apex:param value="xxxAccount" name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>
+                        </apex:commandlink>
+                    </apex:facet>
+                    <apex:outputtext value="{!row.acctname}"/>
+                </apex:column>
+                <apex:column width="5%">
+                    <apex:facet name="header">
+                                <apex:commandlink action="{!sortAction}" value="Owner" >    
+                                <apex:param value="xxxOwner" name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>
+                        </apex:commandlink>
+                    </apex:facet>
+                    <apex:outputtext value="{!row.ownerName}"/>
+                </apex:column>
+<!-- year 1-->
+             <apex:repeat value="{!year1List}" var="period">
+                      <apex:column rendered="{!year1View}" width="{!colWidth}" >
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!period}"  >
+                                <apex:param value="YR1{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.year1Map[period]}" /></apex:outputtext>
+                    </apex:column>
+             </apex:repeat>
+
+                      <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total Y1"  >
+                                <apex:param value="xxxTotal Y1"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.year1Total}" /></apex:outputtext>
+                    </apex:column>                
+                <apex:column width="{!spaceWidth}" styleClass="colSpace"/>  <!-- breaking column -->
+                
+<!-- year 2 -->                
+                <apex:repeat value="{!year2List}" var="period">
+                      <apex:column rendered="{!year2View}" width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!period}"  >
+                                <apex:param value="YR2{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.year2Map[period]}" /></apex:outputtext>
+                    </apex:column>
+                </apex:repeat> 
+                <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total Y2"  >
+                                <apex:param value="xxxTotal Y2"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.year2Total}" /></apex:outputtext>
+                </apex:column>                     
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+
+<!-- opp    -->             
+                <apex:repeat value="{!forecastYearList}" var="period">
+                      <apex:column rendered="{!oppView}" width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!period}"  >
+                                <apex:param value="OPP{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.oppMap[period]}" /></apex:outputtext>
+                    </apex:column>
+                </apex:repeat> 
+                <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total Opps"  >
+                                <apex:param value="xxxOpp Total"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.oppTotal}" /></apex:outputtext>
+                </apex:column>                     
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+                
+                
+<!-- forecast  -->   
+                <apex:repeat value="{!forecastYearList}" var="period">
+                      <apex:column rendered="{!forecastView}" width="{!colWidth}" >
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!period}"  >
+                                <apex:param value="FOR{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" rendered="{!if(editView = false,true,false)}"> <apex:param value="{!row.forecastMap[period].Forecast_Revenue__c}" /></apex:outputtext>  
+                        <apex:inputtext rendered="{!if(editView = true,true,false)}" value="{!row.forecastMap[period].Forecast_Revenue__c}" size="{!inputWidth}"></apex:inputtext>    
+                    </apex:column>                    
+                </apex:repeat>                  
+                <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total Forecast"  >
+                                <apex:param value="xxxForecast Total"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,$###,###,##0}" > <apex:param value="{!row.forecastTotal}" /></apex:outputtext>
+                </apex:column> 
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->
+
+<!-- YoY Growth    -->             
+                <apex:repeat value="{!year2List}" var="period">
+                    <!-- YoY  -->
+                      <apex:column width="{!colWidth}" rendered="{!YoYView}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!period}"  >
+                                <apex:param value="YoY{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!row.YoYGrowthMap[period]}" /></apex:outputtext> 
+                    </apex:column>
+                 </apex:repeat> 
+                <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total YoY"  >
+                                <apex:param value="xxxTotal YoY"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!Row.YoYGrowthTotal}" /></apex:outputtext>
+                </apex:column>
+               <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->                
+     
+<!-- FoY Growth    -->             
+                <apex:repeat value="{!year2List}" var="period">
+                      <apex:column width="{!colWidth}" rendered="{!FoYView}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="{!forecastCompareMap[period]}"  >
+                                <apex:param value="FoY{!period}"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!row.forecastGrowthMap[period]}" /></apex:outputtext> 
+                    </apex:column>                    
+                    
+                </apex:repeat> 
+                <apex:column width="{!colWidth}">
+                        <apex:facet name="header">
+                            <apex:commandlink action="{!sortAction}" value="Total FoY"  >
+                                <apex:param value="xxxTotal FoY"  name="SORT_BY" assignTo="{!SORT_BY}" ></apex:param>  
+                            </apex:commandlink>
+                         </apex:facet>
+                        <apex:outputtext value="{0,number,###,###,##0%}" > <apex:param value="{!Row.forecastGrowthTotal}" /></apex:outputtext>
+                </apex:column>                      
+                
+                <apex:column width="{!spaceWidth}" styleClass="colSpace" ></apex:column><!-- breaking column -->                     
+                
+                <apex:column width="{!colwidth}">
+                    <apex:facet name="header">Forecasting</apex:facet>
+                    <apex:inputcheckbox value="{!row.forecastCheckBox}"></apex:inputcheckbox>        
+                </apex:column>
+                
+                 <apex:column />  <!--   end col to soak up space -->
+            </apex:pageblocktable>
+           
+        
+        </apex:pageBlock>
+    </apex:form>
+
+    <apex:pageBlock >
+    	<apex:pageblocksection title="Instructions">
+        	<ul>
+                <li>
+                    <b>Hide/Unhide Detail</b> Click on the total any in grouping in the summary section to hide and unhide the quarterly detail.
+                </li>
+                <li>
+            	 <b>YoY</b> - Year 2 (most recent 12 months) over year 1   
+				</li>
+                <li>
+                 <b>FoY</b> - Forecast over year 2   
+                </li>
+            </ul>
+        </apex:pageblocksection>
+    </apex:pageBlock>
+
+</apex:page>
