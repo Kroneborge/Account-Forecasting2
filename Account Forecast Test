@@ -1,0 +1,68 @@
+@istest()
+
+public class AccountForecast_TEST {
+
+    
+	testmethod static void AccountForecastTest() {
+        system.debug('%%% AccountGoals_Test %%% - testing null data ');
+
+// test with null data        
+		Accountforecast_class acctGoals = new  Accountforecast_class(); 		
+
+        
+
+// test with just account data
+        system.debug('%%% AccountGoals_Test %%% - testing with account data ');
+		List<Account> acctList = new List<Account>();
+        acctList = GenerateTestData_Test.generateAccountList();        
+        acctGoals = new  Accountforecast_class(); 
+
+// test with opp data 
+	    system.debug('%%% AccountGoals_Test %%% - testing with op data '); 
+        List<Opportunity> oppList = new List<Opportunity>();      
+        oppList = GenerateTestData_Test.generateOppList(acctList);
+        acctGoals = new  Accountforecast_class(); 
+        
+// test the forecast data   
+        system.debug('%%% AccountGoals_Test %%% - testing with forecast data ');
+		List<Account_Forecast__c> forecastList = new List<Account_Forecast__c>();
+        forecastList = GenerateTestData_Test.generateAcctForecastList(acctList);
+        acctGoals = new  Accountforecast_class(); // test with just account and opp data
+            
+// final test all methods
+        system.debug('%%% AccountGoals_Test %%% - final test ');
+        acctGoals.edit();
+        
+        Accountforecast_class.SORT_PREFIX = 'YR1';
+        Accountforecast_class.SORT_BY = acctGoals.year1List.get(0);
+     //   acctGoals.refreshAction();
+        Accountforecast_class.SORT_BY = 'Total Y1';
+     //   acctGoals.refreshAction();    
+        
+        Accountforecast_class.SORT_PREFIX = 'YR2';
+        Accountforecast_class.SORT_BY = acctGoals.year2List.get(0);
+    //    acctGoals.refreshAction();  
+        Accountforecast_class.SORT_BY = 'Total Y2';
+      //  acctGoals.refreshAction();   
+        
+        Accountforecast_class.SORT_PREFIX = 'opp';
+        Accountforecast_class.SORT_BY = acctGoals.forecastYearList.get(0);
+      //  acctGoals.refreshAction();  
+        Accountforecast_class.SORT_BY = 'Opp Total';
+       // acctGoals.refreshAction();   
+
+        Accountforecast_class.SORT_PREFIX = 'FOR';
+        Accountforecast_class.SORT_BY = acctGoals.forecastYearList.get(0);
+     //   acctGoals.refreshAction();  
+        Accountforecast_class.SORT_BY = 'Forecast Total';
+      //  acctGoals.refreshAction();   
+        
+        acctGoals.limitVar = 5;
+        acctGoals.numOfAccounts();
+        acctGoals.HideUnhide();
+        acctGoals.save();
+        acctGoals.selectedRep = UserInfo.getName();
+        acctGoals.selectedRepAction();
+
+        }
+}
